@@ -7,7 +7,7 @@
 2. Identifies whether a number is even or odd.
 3. Provides the sum of digits of the number.
 4. Returns a fun fact about the number.
-
+   
  ## Technology Stack
 1. Programming Language: Python
 2. Framework: FastAPI
