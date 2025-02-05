@@ -1,17 +1,21 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Query, HTTPException
+from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
 
 app = FastAPI()
 
-def is_armstrong(n: int) -> bool:
-    digits = [int(d) for d in str(n)]
-    power = len(digits)
-    return sum(d ** power for d in digits) == n
-
-def get_digit_sum(n: int) -> int:
-    return sum(map(int, str(n)))
+# Enable CORS for all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def is_prime(n: int) -> bool:
-    if n < 2:
+    """Check if a number is prime."""
+    if n < 2 or n % 1 != 0:
         return False
     for i in range(2, int(n ** 0.5) + 1):
         if n % i == 0:
@@ -19,43 +23,75 @@ def is_prime(n: int) -> bool:
     return True
 
 def is_perfect(n: int) -> bool:
-    return n > 1 and sum(i for i in range(1, n // 2 + 1) if n % i == 0) == n
+    """Check if a number is a perfect number. 0 should NOT be perfect."""
+    if n <= 0 or n % 1 != 0:
+        return False
+    return sum(i for i in range(1, int(n)) if int(n) % i == 0) == int(n)
 
-# API Health Check Endpoint with Status Code 200
-@app.get("/api/health-check", status_code=200)
-async def health_check():
-    return {"status": "API is running smoothly", "code": 200}
+def is_armstrong(n: int) -> bool:
+    """Check if a number is an Armstrong number."""
+    if n % 1 != 0:
+        return False
+    digits = [int(d) for d in str(abs(int(n)))]
+    return sum(d ** len(digits) for d in digits) == abs(int(n))
 
-# Number Classification Endpoint
+@app.get("/")
+def read_root():
+    """Handles requests to the root endpoint with a 400 Bad Request error."""
+    raise HTTPException(status_code=400, detail="Invalid endpoint. Use '/api/classify-number'")
+
 @app.get("/api/classify-number")
-async def classify_number(number: str):
-    # Handle invalid input
-    if not number.isdigit():
-        raise HTTPException(status_code=400, detail={"number": "alphabet", "error": True})
+def classify_number(number: str = Query(..., description="Number to classify")):
+    """API Endpoint to classify a number."""
+    
+    # Validate number format
+    if not number.replace(".", "").replace("-", "").isdigit():
+        return JSONResponse(
+            status_code=400,
+            content={"number": number, "error": True, "message": "Invalid number format"},
+        )
+    
+    try:
+        number = float(number)
+        if number % 1 == 0:
+            number = int(number)
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"number": number, "error": True, "message": "Invalid number format"},
+        )
 
-    number = int(number)
-
-    # Classify properties
-    properties = ["even" if number % 2 == 0 else "odd"]
+    properties = []
+    
     if is_armstrong(number):
         properties.append("armstrong")
+    if number % 2 == 0:
+        properties.append("even")
+    else:
+        properties.append("odd")
 
-    return {
+    if is_armstrong(number):
+        digits = [int(d) for d in str(abs(int(number)))]
+        powers = " + ".join([f"{d}^{len(digits)}" for d in digits])
+        fun_fact = f"{number} is an Armstrong number because {powers} = {number}"
+    else:
+        fun_fact = f"{number} is not an Armstrong number."
+
+    response = {
         "number": number,
         "is_prime": is_prime(number),
         "is_perfect": is_perfect(number),
         "properties": properties,
-        "digit_sum": get_digit_sum(number),
-        "fun_fact": f"{number} is {'an Armstrong' if is_armstrong(number) else 'not an Armstrong'} number because 3^3 + 7^3 + 1^3 = 371"
+        "digit_sum": sum(map(int, str(abs(int(number))))),
+        "fun_fact": fun_fact
     }
 
-# CORS setup (optional)
-from fastapi.middleware.cors import CORSMiddleware
+    return JSONResponse(status_code=200, content=response)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Adjust this to specify allowed origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.exception_handler(422)
+async def validation_exception_handler(request, exc):
+    """Ensures invalid inputs return a 400 Bad Request."""
+    return JSONResponse(
+        status_code=400,
+        content={"error": True, "message": "Invalid input. Please provide a valid number."},
+    )
