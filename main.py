@@ -93,5 +93,5 @@ async def validation_exception_handler(request, exc):
     """Ensures invalid inputs return a 400 Bad Request."""
     return JSONResponse(
         status_code=400,
-        content={"error": True, "message": "Invalid input. Please provide a valid number."},
+        content={"error": True, },
     )
