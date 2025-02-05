@@ -58,7 +58,7 @@ def classify_number(number: str = Query(..., description="Number to classify")):
     except Exception:
         return JSONResponse(
             status_code=400,
-            content={"number": number, "error": True, "message": "Invalid number format"},
+            content={"number": number, "error": True, },
         )
 
     properties = []
